@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  APPROVER
+  DEPT_HEAD
+  TEACHER
+  OFFICE
+}
+
+enum TaskStatus {
+  RUNNING
+  DONE
+  FAILED
+  PENDING_APPROVAL
+}
+
+enum ApprovalStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum WaStatus {
+  NOT_SENT
+  SENT
+  CONFIRMED
+  DECLINED
+}
+
+model User {
+  id          String     @id @default(cuid())
+  email       String     @unique
+  name        String
+  role        Role       @default(TEACHER)
+  department  String?
+  subjects    String[]
+  isActive    Boolean    @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime   @default(now())
+  tasks       Task[]
+  documents   Document[]
+}
+
+model Task {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id])
+  title     String
+  agentId   String
+  status    TaskStatus @default(RUNNING)
+  createdAt DateTime   @default(now())
+  document  Document?
+}
+
+model Document {
+  id             String         @id @default(cuid())
+  taskId         String         @unique
+  task           Task           @relation(fields: [taskId], references: [id])
+  userId         String
+  user           User           @relation(fields: [userId], references: [id])
+  title          String
+  docType        String
+  content        String         @db.Text
+  approvalStatus ApprovalStatus @default(NOT_REQUIRED)
+  approvedBy     String?
+  createdAt      DateTime       @default(now())
+}
+
+model Timetable {
+  id          String  @id @default(cuid())
+  teacherName String
+  dayOfWeek   Int
+  period      Int
+  classCode   String?
+  subject     String?
+  term        String
+
+  @@unique([teacherName, dayOfWeek, period, term])
+}
+
+model Template {
+  id        String  @id @default(cuid())
+  docType   String
+  name      String
+  content   String  @db.Text
+  isDefault Boolean @default(false)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  agentId   String?
+  engine    String
+  docType   String?
+  createdAt DateTime @default(now())
+}
+
+model SubstitutionRequest {
+  id            String   @id @default(cuid())
+  requesterName String
+  date          DateTime
+  periods       Int[]
+  classCode     String
+  subject       String
+  reason        String
+  candidateName String?
+  waStatus      WaStatus @default(NOT_SENT)
+  createdAt     DateTime @default(now())
+}

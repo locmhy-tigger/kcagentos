@@ -1,0 +1,29 @@
+:root {
+  /* 主色 — 基智藍 */
+  --primary:       rgba(47,145,190,1);
+  --primary-dark:  #1F6A8E;
+  --primary-light: rgba(231,241,249,1);
+
+  /* 紙感底色系 */
+  --bg:     #F9FAFB;
+  --bg2:    var(--primary-light);
+  --card:   #FFFFFF;
+
+  /* 墨色文字系 */
+  --ink:    #1A2430;
+  --ink2:   #44505E;
+  --ink3:   #7A8694;
+
+  /* 功能色 */
+  --seal:   #B84030;
+  --green:  #1A7A62;
+  --amber:  #C8831A;
+
+  --border:  rgba(47,145,190,0.18);
+  --border2: rgba(47,145,190,0.32);
+
+  /* 字體 */
+  --serif: 'Noto Serif TC', serif;
+  --sans:  'DM Sans', 'Noto Sans TC', system-ui;
+  --mono:  'DM Mono', monospace;
+}

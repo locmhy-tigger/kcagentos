@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 基智 Agent OS 設計 tokens */
+:root {
+  --primary:       rgba(47,145,190,1);
+  --primary-dark:  #1F6A8E;
+  --primary-light: rgba(231,241,249,1);
+  --bg:            #F9FAFB;
+  --bg2:           var(--primary-light);
+  --card:          #FFFFFF;
+  --ink:           #1A2430;
+  --ink2:          #44505E;
+  --ink3:          #7A8694;
+  --seal:          #B84030;
+  --green:         #1A7A62;
+  --amber:         #C8831A;
+  --border:        rgba(47,145,190,0.18);
+  --border2:       rgba(47,145,190,0.32);
+  --serif:         'Noto Serif TC', serif;
+  --sans:          'DM Sans', 'Noto Sans TC', system-ui;
+  --mono:          'DM Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  color:       var(--ink);
+  background:  var(--bg);
+  font-family: var(--sans);
+  margin:      0;
+  padding:     0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 滾動條美化 */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary); }

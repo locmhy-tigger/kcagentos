@@ -1,21 +1,18 @@
 import { getServerSession, type NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@prisma/client";
 
 const ALLOWED_DOMAIN = "gs.keichi.edu.hk";
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  // 移除 PrismaAdapter — JWT strategy 唔需要 Account/Session tables
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
-        params: {
-          hd: ALLOWED_DOMAIN,
-        },
+        params: { hd: ALLOWED_DOMAIN },
       },
     }),
   ],
@@ -23,18 +20,33 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ profile }) {
       const email = profile?.email ?? "";
-      if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) return "/login?error=domain";
+      if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) return false;
+
+      // 首次登入自動建 User，更新 lastLoginAt
+      await prisma.user.upsert({
+        where: { email },
+        update: { lastLoginAt: new Date(), name: profile?.name ?? email.split("@")[0] },
+        create: {
+          email,
+          name: profile?.name ?? email.split("@")[0],
+          role: "TEACHER",
+          lastLoginAt: new Date(),
+        },
+      });
       return true;
     },
-    async jwt({ token, user }) {
-      if (user) {
+    async jwt({ token }) {
+      // 每次刷新 token 時從 DB 取最新角色（確保角色變更即時生效）
+      const email = token.email;
+      if (email) {
         const dbUser = await prisma.user.findUnique({
-          where: { email: token.email! },
-          select: { id: true, role: true, department: true, name: true },
+          where: { email },
+          select: { id: true, role: true, department: true, isActive: true },
         });
         if (dbUser) {
-          token.userId = dbUser.id;
-          token.role = dbUser.role;
+          if (!dbUser.isActive) throw new Error("account_disabled");
+          token.userId     = dbUser.id;
+          token.role       = dbUser.role;
           token.department = dbUser.department;
         }
       }
@@ -42,31 +54,16 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.userId as string;
-        session.user.role = token.role as Role;
+        session.user.id         = token.userId as string;
+        session.user.role       = token.role as Role;
         session.user.department = token.department as string | null;
       }
       return session;
     },
   },
-  events: {
-    async signIn({ user }) {
-      if (!user.email) return;
-      await prisma.user.upsert({
-        where: { email: user.email },
-        update: { lastLoginAt: new Date() },
-        create: {
-          email: user.email,
-          name: user.name ?? user.email.split("@")[0],
-          role: "TEACHER",
-          lastLoginAt: new Date(),
-        },
-      });
-    },
-  },
   pages: {
     signIn: "/login",
-    error: "/login",
+    error:  "/login",
   },
 };
 
@@ -81,8 +78,8 @@ export async function requireRole(
     throw new AuthError(403, "權限不足");
   return {
     userId: session.user.id,
-    role: session.user.role as Role,
-    email: session.user.email!,
+    role:   session.user.role as Role,
+    email:  session.user.email!,
   };
 }
 
@@ -94,3 +91,4 @@ export class AuthError extends Error {
     super(message);
   }
 }
+

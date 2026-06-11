@@ -97,6 +97,11 @@ export default function ChatPanel({ onAgentStatus, initialPrompt, engine = "clau
               onAgentStatus?.(data.agentId, "running");
             }
 
+            // 伺服器錯誤 → 顯示錯誤訊息
+            if (data.error) {
+              accumulated = `⚠ ${data.error}`;
+            }
+
             if (data.chunk && data.text) {
               accumulated += data.text;
               setStreaming(accumulated);
@@ -109,12 +114,13 @@ export default function ChatPanel({ onAgentStatus, initialPrompt, engine = "clau
             if (data.final) {
               if (data.documentId) {
                 docInfo = {
-                  documentId:   data.documentId,
-                  docType:      data.docType,
+                  documentId:    data.documentId,
+                  docType:       data.docType,
                   needsApproval: data.needsApproval,
                 };
               }
-              if (!data.chunk && data.text) accumulated = data.text;
+              // Dispatcher 直接回傳（非 stream）
+              if (!data.chunk && data.text && !accumulated) accumulated = data.text;
             }
           } catch {}
         }
@@ -128,16 +134,19 @@ export default function ChatPanel({ onAgentStatus, initialPrompt, engine = "clau
         .replace(/\[NEED_TOOL:\w+\]/g, "")
         .trim();
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          role:    "assistant",
-          content: cleanText,
-          agentId: currentAgent,
-          ...docInfo,
-          docTitle: cleanText.split("\n").find((l) => l.trim())?.slice(0, 50),
-        },
-      ]);
+      // 只有真正有內容才加到訊息列表
+      if (cleanText) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role:    "assistant",
+            content: cleanText,
+            agentId: currentAgent,
+            ...docInfo,
+            docTitle: cleanText.split("\n").find((l) => l.trim())?.slice(0, 50),
+          },
+        ]);
+      }
     } catch {
       setMessages((prev) => [
         ...prev,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 interface Task {
   id:       string;
@@ -15,6 +16,7 @@ interface SkillCard {
   icon:  string;
   label: string;
   color: string;
+  href?: string;
 }
 
 const SKILL_CARDS: { section: string; cards: SkillCard[] }[] = [
@@ -31,10 +33,11 @@ const SKILL_CARDS: { section: string; cards: SkillCard[] }[] = [
     section: "校務行政",
     cards: [
       { id: "parent-notice",   icon: "✉️", label: "家長通告",   color: "var(--primary-light)" },
+      { id: "activity-notice", icon: "📋", label: "活動通告",   color: "var(--bg2)",          href: "/tools/notice" },
+      { id: "procurement",     icon: "🛒", label: "口頭報價表", color: "var(--primary-light)", href: "/tools/quotation" },
       { id: "outing-permit",   icon: "🚪", label: "外出許可",   color: "var(--bg2)" },
-      { id: "procurement",     icon: "🛒", label: "採購申請",   color: "var(--primary-light)" },
-      { id: "event-form",      icon: "📝", label: "活動報名表", color: "var(--bg2)" },
-      { id: "meeting-minutes", icon: "🗒️", label: "會議記錄",  color: "var(--primary-light)" },
+      { id: "event-form",      icon: "📝", label: "活動報名表", color: "var(--primary-light)" },
+      { id: "meeting-minutes", icon: "🗒️", label: "會議記錄",  color: "var(--bg2)" },
     ],
   },
   {
@@ -54,6 +57,7 @@ const SKILL_CARDS: { section: string; cards: SkillCard[] }[] = [
       { id: "dept-notice", icon: "📢", label: "科組通告",   color: "var(--primary-light)" },
       { id: "study-plan",  icon: "🎯", label: "學習計劃",   color: "var(--bg2)" },
       { id: "event-plan",  icon: "📅", label: "活動計劃",   color: "var(--primary-light)" },
+      { id: "templates",   icon: "📚", label: "範本庫",     color: "var(--bg2)",          href: "/settings/templates" },
     ],
   },
 ];
@@ -180,35 +184,57 @@ export default function SkillRail({ onPrompt }: SkillRailProps) {
             {section.section}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
-            {section.cards.map((card) => (
-              <button
-                key={card.id}
-                onClick={() => {
-                  const prompt = SKILL_PROMPTS[card.id];
-                  if (prompt) onPrompt(prompt);
-                }}
-                style={{
-                  background:   card.color,
-                  border:       "1px solid var(--border)",
-                  borderRadius: 4,
-                  padding:      "8px 6px",
-                  cursor:       "pointer",
-                  textAlign:    "left",
-                  boxShadow:    "1px 1px 0 var(--card)",
-                  transition:   "box-shadow 0.1s",
-                  display:      "flex",
-                  flexDirection: "column",
-                  gap:          2,
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "2px 2px 0 var(--primary)")}
-                onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "1px 1px 0 var(--card)")}
-              >
-                <span style={{ fontSize: 14 }}>{card.icon}</span>
-                <span style={{ fontSize: 10, color: "var(--ink)", lineHeight: 1.3, fontFamily: "var(--sans)" }}>
-                  {card.label}
-                </span>
-              </button>
-            ))}
+            {section.cards.map((card) => {
+              const cardStyle = {
+                background:    card.color,
+                border:        "1px solid var(--border)",
+                borderRadius:  4,
+                padding:       "8px 6px",
+                cursor:        "pointer",
+                textAlign:     "left" as const,
+                boxShadow:     "1px 1px 0 var(--card)",
+                transition:    "box-shadow 0.1s",
+                display:       "flex",
+                flexDirection: "column" as const,
+                gap:           2,
+                textDecoration: "none",
+              };
+              const inner = (
+                <>
+                  <span style={{ fontSize: 14 }}>{card.icon}</span>
+                  <span style={{ fontSize: 10, color: "var(--ink)", lineHeight: 1.3, fontFamily: "var(--sans)" }}>
+                    {card.label}
+                  </span>
+                </>
+              );
+              if (card.href) {
+                return (
+                  <Link
+                    key={card.id}
+                    href={card.href}
+                    style={cardStyle}
+                    onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.boxShadow = "2px 2px 0 var(--primary)")}
+                    onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.boxShadow = "1px 1px 0 var(--card)")}
+                  >
+                    {inner}
+                  </Link>
+                );
+              }
+              return (
+                <button
+                  key={card.id}
+                  onClick={() => {
+                    const prompt = SKILL_PROMPTS[card.id];
+                    if (prompt) onPrompt(prompt);
+                  }}
+                  style={cardStyle}
+                  onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "2px 2px 0 var(--primary)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "1px 1px 0 var(--card)")}
+                >
+                  {inner}
+                </button>
+              );
+            })}
           </div>
         </div>
       ))}

@@ -72,16 +72,12 @@
 - [ ] `7.4` 測試：切換 Ollama 引擎 → 對話正常 → header 顯示「本地」
 - [ ] `7.5` 更新 `tasks/lessons.md`
 
----
+### 0. 範本庫（提早至 Phase 2）✅ 已完成
 
-### 備註：範本上載
-
-範本庫管理（`/settings/templates`，含 `{{變數}}` 佔位符）按 PRD 屬 **Phase 3**。
-如需提前到 Phase 2，請喺確認時註明，會加入以下任務：
-
-- `/settings/templates` 管理頁（CRUD、isDefault 開關、權限按 §9.1 矩陣）
-- `CRUD /api/templates`
-- Agent 生成時優先套用 isDefault 範本（`template_get` 工具）
+- [x] `0.1` `/settings/templates` 管理頁（CRUD、isDefault 開關、所有登入用戶可用）
+- [x] `0.2` `GET/POST /api/templates` + `GET/PATCH/DELETE /api/templates/[id]`
+- [x] `0.3` Agent 生成前自動查找預設範本，注入 Specialist 系統提示（`AGENT_DOC_TYPES` 映射）
+- [x] `0.4` Header 用戶選單 + SkillRail 加入「範本庫」快速連結
 
 ---
 

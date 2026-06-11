@@ -67,7 +67,29 @@ export function agentName(key: AgentKey): string {
   return names[key];
 }
 
+export function parseDocTitle(text: string): string | null {
+  const match = text.match(/\[TITLE:([^\]]+)\]/);
+  return match ? match[1].trim() : null;
+}
+
+// Maps each specialist agent to the docTypes it typically produces
+export const AGENT_DOC_TYPES: Partial<Record<AgentKey, string[]>> = {
+  ada:   ["unit-plan", "notes", "study-plan", "event-plan"],
+  ethan: ["exam", "worksheet"],
+  carla: ["report", "other"],
+  andy:  ["parent-notice", "dept-notice", "meeting-minutes", "event-form"],
+  donna: ["report", "other"],
+};
+
 export function inferTitleFromContent(docType: string, content: string): string {
-  const firstLine = content.split("\n").find((l) => l.trim())?.slice(0, 40) ?? "";
+  // 優先用 [TITLE:xxx] 標記
+  const tagged = parseDocTitle(content);
+  if (tagged) return tagged;
+  // 其次取第一個非空行，去除 Markdown 標記
+  const firstLine = content
+    .split("\n")
+    .find((l) => l.trim() && !l.startsWith("["))
+    ?.replace(/^#+\s*/, "")
+    .slice(0, 60) ?? "";
   return firstLine || docType;
 }

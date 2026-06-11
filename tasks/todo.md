@@ -82,3 +82,95 @@
 ---
 
 _最後更新：Phase 2 實施完成（2026-06-11）_
+
+---
+
+## Phase 3 — 流程與整合（待確認後開始）
+
+> **驗收標準：** 家長通告生成後狀態 = PENDING\_APPROVAL → APPROVER（副校長）一鍵批核 → DocCard 解鎖「發出」按鈕；生成文件自動存入 Google Drive；代課確認後事件寫入教師 Calendar；語音輸入可用；週五自動推送週摘要。
+
+---
+
+### 1. 審批流程
+
+> 已有基礎：`Document.approvalStatus`（NOT_REQUIRED / PENDING / APPROVED / REJECTED）、`[NEEDS_APPROVAL]` 標記、`APPROVER` 角色。本節打通整條流程。
+
+- [ ] `1.1` Prisma migration：`Document` 加 `approvedBy String?`（批核人 userId）、`approvedAt DateTime?`、`rejectionReason String?`
+- [ ] `1.2` `/approvals` 頁面（APPROVER + ADMIN）：待批清單，每行顯示文件標題、申請人、類型、提交時間，可展開預覽內容
+- [ ] `1.3` `PATCH /api/approvals/[id]`：批核（→ APPROVED）或退回（→ REJECTED，附原因）；寫 AuditLog（action=APPROVE / REJECT）
+- [ ] `1.4` DocCard UI 更新：`PENDING` → 顯示「⏳ 待 APPROVER 批核」鎖定狀態；`REJECTED` → 顯示退回原因；`APPROVED` → 解鎖 Word / PDF 下載及 WhatsApp 推送按鈕
+- [ ] `1.5` Pusher 通知：批核 / 退回時廣播俾申請人（channel `user-{userId}`，event `doc-approval`）→ 前端 toast
+- [ ] `1.6` Header 加「待批核」紅點徽章（APPROVER 專屬），輪詢 `GET /api/approvals?status=PENDING`，有未處理項目時顯示數字
+
+---
+
+### 2. 範本庫 ✅ Phase 2 已完成
+
+> `/settings/templates` CRUD、isDefault、`{{佔位符}}`、Agent 注入均已在 Phase 2 實施。Phase 3 如有需要可加版本歷史或多語言範本，暫列為選做。
+
+- [ ] `2.1`（選做）範本版本歷史：每次 PATCH 前保存舊版，可一鍵還原
+- [ ] `2.2`（選做）範本預覽：前端即時把 `{{佔位符}}` 替換成示例值顯示效果
+
+---
+
+### 3. Google Drive 存檔
+
+> 依賴：Google Workspace service account（與現有 Google SSO 同一 project）或 OAuth2 impersonation。
+
+- [ ] `3.1` Prisma migration：`Document` 加 `driveUrl String?`、`driveFileId String?`
+- [ ] `3.2` `src/lib/gdrive.ts`：`googleapis` npm client（service account JWT auth）；`ensurePath(docType, date)` 建立 / 找到 `學校文件/{docType}/{YYYY-MM}/` 資料夾；`uploadFile(buffer, filename, mimeType, folderId)` 回傳 `{ id, webViewLink }`
+- [ ] `3.3` `/api/doc` 生成後：DOCX + PDF 各上傳一份，更新 `Document.driveUrl` + `driveFileId`（背景執行，失敗唔影響下載）
+- [ ] `3.4` DocCard 顯示「☁ Drive 連結」按鈕（driveUrl 存在時才顯示）
+- [ ] `3.5` `.env.example` 加：`GOOGLE_SERVICE_ACCOUNT_JSON`（base64 編碼的 service account key JSON）、`GOOGLE_DRIVE_ROOT_FOLDER_ID`
+
+---
+
+### 4. Google Calendar 代課事件
+
+> 代課老師 WhatsApp 回覆 CONFIRMED → `SubstitutionRequest.waStatus = CONFIRMED` → 自動在代課老師 Calendar 建立事件。
+
+- [ ] `4.1` `src/lib/gcal.ts`：`googleapis` Calendar client；`createSubstitutionEvent(sub)` → 建立事件（title=`代課：{classCode} {subject}`、開始/結束時間由節次換算、description=`代替 {requesterName} 老師`）
+- [ ] `4.2` `/api/notify/callback` 在 status=CONFIRMED 後呼叫 `createSubstitutionEvent`（背景，失敗唔影響回調回應）
+- [ ] `4.3` `SubstitutionRequest` 加 `calendarEventId String?`（Prisma migration）
+- [ ] `4.4` `.env.example` 加：`GOOGLE_CALENDAR_ID`（default calendar ID，或可按老師 email 查對應 calendar）
+- [ ] `4.5` 節次時間對照表（config）：節次 1-9 對應學校上課時間（`src/lib/schedule.ts`）
+
+---
+
+### 5. 語音輸入
+
+> Web Speech API（瀏覽器原生，無需後端）；HTTPS 已由 Zeabur 提供。
+
+- [ ] `5.1` `src/components/VoiceButton.tsx`：`SpeechRecognition` API 封裝，語言設 `zh-HK`；錄音中顯示紅色脈衝動畫；interim transcript 即時顯示到 textarea
+- [ ] `5.2` ChatPanel 輸入區加咪高風按鈕（緊靠 textarea 右側）；瀏覽器不支援時自動隱藏（`typeof SpeechRecognition === 'undefined'`）
+- [ ] `5.3` 靜音自動停止（`SpeechRecognition.continuous = false`），錄音結果追加到現有輸入內容
+- [ ] `5.4` 視覺反饋：錄音中 textarea border 轉紅色 + 「🎙 錄音中…」提示
+
+---
+
+### 6. 每週摘要 Cron
+
+> Zeabur scheduled job 呼叫安全端點，不依賴前端。
+
+- [ ] `6.1` `GET /api/cron/weekly-summary`：header `x-cron-secret: {CRON_SECRET}` 驗證；查最近 7 天 Task / AuditLog / SubstitutionRequest
+- [ ] `6.2` 統計：總任務數（按 Agent / docType 分）、DOCX / PDF 生成數、WhatsApp 推送數、審批數（批核 / 退回）、代課數
+- [ ] `6.3` 用 Claude（claude-haiku-4-5）生成摘要段落，標示異常（如某天任務量暴升）
+- [ ] `6.4` 推送 via `sendWhatsApp()`（發到 `WEEKLY_SUMMARY_RECIPIENTS`，逗號分隔電話）
+- [ ] `6.5` `.env.example` 加：`CRON_SECRET`、`WEEKLY_SUMMARY_RECIPIENTS`
+- [ ] `6.6` Zeabur cron 表達式：`0 8 * * 5`（UTC 08:00 = HKT 16:00，每週五）；說明寫入 `tasks/zeabur-cron.md`
+
+---
+
+### 7. 收尾與驗收
+
+- [ ] `7.1` 審批流程端到端：出家長通告 → PENDING → APPROVER 批核 → DocCard 解鎖 → 下載 / 推送
+- [ ] `7.2` 退回流程：APPROVER 退回並填原因 → 申請人收 toast → DocCard 顯示退回原因
+- [ ] `7.3` Google Drive：生成 DOCX → 確認檔案出現在 Drive `學校文件/{type}/{YYYY-MM}/`
+- [ ] `7.4` Google Calendar：代課 CONFIRMED → 事件出現在代課老師 Calendar
+- [ ] `7.5` 語音輸入：Chrome/Safari 講廣東話 → 文字準確出現在輸入框
+- [ ] `7.6` 週摘要：手動 curl `/api/cron/weekly-summary` → WhatsApp 收到摘要
+- [ ] `7.7` 更新 `tasks/lessons.md`
+
+---
+
+_Phase 3 任務清單建立於 2026-06-11，等待確認後開始實施_

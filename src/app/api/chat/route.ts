@@ -7,6 +7,7 @@ import {
   parseDocReady,
   parseDocType,
   parseNeedsApproval,
+  parseDocTitle,
   agentId,
   inferTitleFromContent,
 } from "@/lib/agents";
@@ -111,12 +112,17 @@ export async function POST(req: NextRequest) {
         const docReady      = parseDocReady(fullText);
         const docType       = parseDocType(fullText);
         const needsApproval = parseNeedsApproval(fullText);
+        const docTitleTag   = parseDocTitle(fullText);
 
         const cleanContent = fullText
           .replace(/\[DOCREADY\]/g, "")
           .replace(/\[DOCTYPE:[^\]]+\]/g, "")
+          .replace(/\[TITLE:[^\]]+\]/g, "")
           .replace(/\[NEEDS_APPROVAL\]/g, "")
           .trim();
+
+        // 檔案名稱：優先用 [TITLE:xxx]，其次從內容首行提取
+        const docTitle = docTitleTag ?? inferTitleFromContent(docType, cleanContent);
 
         let documentId: string | null = null;
 
@@ -125,7 +131,7 @@ export async function POST(req: NextRequest) {
             const task = await prisma.task.create({
               data: {
                 userId,
-                title:   `${docType} · ${specAgentId}`,
+                title:   docTitle,
                 agentId: specAgentId,
                 status:  needsApproval ? "PENDING_APPROVAL" : "DONE",
               },
@@ -134,7 +140,7 @@ export async function POST(req: NextRequest) {
               data: {
                 taskId:         task.id,
                 userId,
-                title:          inferTitleFromContent(docType, cleanContent),
+                title:          docTitle,
                 docType,
                 content:        cleanContent,
                 approvalStatus: needsApproval ? "PENDING" : "NOT_REQUIRED",

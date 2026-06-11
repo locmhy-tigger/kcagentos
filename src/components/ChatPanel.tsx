@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import DocCard from "./DocCard";
+import VoiceButton from "./VoiceButton";
 import type { AgentStatus } from "./Header";
 
 interface Message {
@@ -448,6 +449,10 @@ export default function ChatPanel({ onAgentStatus, initialPrompt, engine = "clau
             boxShadow:  "2px 2px 0 var(--primary-light)",
             lineHeight: 1.5,
           }}
+        />
+        <VoiceButton
+          onResult={(text) => setInput((prev) => prev ? `${prev} ${text}` : text)}
+          disabled={loading}
         />
         <button
           type="submit"

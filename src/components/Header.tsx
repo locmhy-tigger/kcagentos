@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type AgentStatus = "idle" | "running" | "done";
 
@@ -28,7 +28,26 @@ interface HeaderProps {
 
 export default function Header({ agentStatuses = {}, engine = "claude", onOpenSettings }: HeaderProps) {
   const { data: session } = useSession();
-  const [showMenu, setShowMenu] = useState(false);
+  const [showMenu,      setShowMenu]      = useState(false);
+  const [pendingCount,  setPendingCount]  = useState(0);
+
+  const isApprover = session?.user?.role === "ADMIN" || session?.user?.role === "APPROVER";
+
+  useEffect(() => {
+    if (!isApprover) return;
+    async function fetchPending() {
+      try {
+        const res = await fetch("/api/approvals?status=PENDING");
+        if (res.ok) {
+          const data = await res.json();
+          setPendingCount(Array.isArray(data) ? data.length : 0);
+        }
+      } catch {}
+    }
+    fetchPending();
+    const id = setInterval(fetchPending, 30_000);
+    return () => clearInterval(id);
+  }, [isApprover]);
 
   const engineLabel = engine === "claude" ? "Claude" : engine === "ollama" ? "本地 Ollama" : "本地 LM Studio";
   const engineColor = engine === "claude" ? "var(--primary)" : "var(--amber)";
@@ -112,6 +131,30 @@ export default function Header({ agentStatuses = {}, engine = "claude", onOpenSe
           );
         })}
       </div>
+
+      {/* 待批核文件徽章 (ADMIN/APPROVER) */}
+      {isApprover && (
+        <a
+          href="/approvals"
+          style={{
+            fontFamily:  "var(--mono)",
+            fontSize:    10,
+            color:       pendingCount > 0 ? "#fff" : "var(--ink3)",
+            background:  pendingCount > 0 ? "var(--amber)" : "var(--primary-light)",
+            border:      `1px solid ${pendingCount > 0 ? "var(--amber)" : "var(--border)"}`,
+            padding:     "2px 8px",
+            borderRadius: 3,
+            flexShrink:  0,
+            textDecoration: "none",
+            display:     "flex",
+            alignItems:  "center",
+            gap:         4,
+          }}
+          title="待批核文件"
+        >
+          📋 {pendingCount > 0 ? `${pendingCount} 待批核` : "批核"}
+        </a>
+      )}
 
       {/* 引擎標籤（撳入去開設定） */}
       <button

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import Pusher from "pusher";
+import { createSubstitutionEvent, isCalendarConfigured } from "@/lib/gcal";
 
 const pusher =
   process.env.PUSHER_APP_ID && process.env.PUSHER_KEY && process.env.PUSHER_SECRET
@@ -57,6 +58,31 @@ export async function POST(req: NextRequest) {
         message: status === "CONFIRMED" ? `✓ ${name}已確認代課` : `✗ ${name}婉拒咗代課，請另覓人選`,
       });
     } catch {}
+  }
+
+  // Create Google Calendar event when teacher confirms
+  if (status === "CONFIRMED" && isCalendarConfigured() && !sub.calendarEventId) {
+    try {
+      const dateStr = sub.date.toISOString().slice(0, 10);
+      const eventId = await createSubstitutionEvent({
+        date:          dateStr,
+        periods:       sub.periods,
+        classCode:     sub.classCode,
+        subject:       sub.subject,
+        requesterName: sub.requesterName,
+        reason:        sub.reason,
+        candidateName: teacherName ?? sub.candidateName ?? "代課老師",
+        candidateEmail: sub.candidateEmail,
+      });
+      if (eventId) {
+        await prisma.substitutionRequest.update({
+          where: { id: requestId },
+          data:  { calendarEventId: eventId },
+        });
+      }
+    } catch (err) {
+      console.error("[gcal create event]", err);
+    }
   }
 
   return NextResponse.json({ ok: true, requestId, status });

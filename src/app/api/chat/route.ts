@@ -10,6 +10,8 @@ import {
   parseDocTitle,
   agentId,
   inferTitleFromContent,
+  AGENT_DOC_TYPES,
+  type AgentKey,
 } from "@/lib/agents";
 import { prisma } from "@/lib/prisma";
 import Pusher from "pusher";
@@ -96,7 +98,24 @@ export async function POST(req: NextRequest) {
         await pushEvent(channelName, "agent-status", { agentId: specAgentId, status: "running" });
         send({ agentId: specAgentId, status: "running", route: routeKey });
 
-        const specialistSystem = loadCharter(routeKey);
+        // Inject any default templates for this agent's docTypes
+        let specialistSystem = loadCharter(routeKey);
+        try {
+          const relevantTypes = AGENT_DOC_TYPES[routeKey as AgentKey] ?? [];
+          if (relevantTypes.length > 0) {
+            const defaultTemplates = await prisma.template.findMany({
+              where: { docType: { in: relevantTypes }, isDefault: true },
+            });
+            if (defaultTemplates.length > 0) {
+              const sections = defaultTemplates.map((t) =>
+                `【${t.name}】（類型：${t.docType}）\n${t.content}`
+              ).join("\n\n---\n\n");
+              specialistSystem += `\n\n---\n[範本庫]\n以下是管理員設定的預設範本，請參考其格式和結構生成文件。使用 {{}} 佔位符標示的位置請根據對話內容填充實際資訊。\n\n${sections}`;
+            }
+          }
+        } catch {
+          // 範本查詢失敗不影響正常生成
+        }
         let fullText = "";
 
         for await (const chunk of streamLLM(engine, messages, {

@@ -57,6 +57,7 @@ const SKILL_CARDS: { section: string; cards: SkillCard[] }[] = [
       { id: "dept-notice", icon: "📢", label: "科組通告",   color: "var(--primary-light)" },
       { id: "study-plan",  icon: "🎯", label: "學習計劃",   color: "var(--bg2)" },
       { id: "event-plan",  icon: "📅", label: "活動計劃",   color: "var(--primary-light)" },
+      { id: "templates",   icon: "📚", label: "範本庫",     color: "var(--bg2)",          href: "/settings/templates" },
     ],
   },
 ];

@@ -165,6 +165,9 @@ export default function Header({ agentStatuses = {}, engine = "claude" }: Header
                 <div style={{ fontSize: 10, color: "var(--ink3)", fontFamily: "var(--mono)" }}>{session.user.email}</div>
                 <div style={{ fontSize: 10, color: "var(--primary)", marginTop: 2 }}>{session.user.role}</div>
               </div>
+              <a href="/settings/templates" style={{ display: "block", padding: "6px 16px", fontSize: 13, color: "var(--ink2)", textDecoration: "none" }}>
+                範本庫
+              </a>
               {session.user.role === "ADMIN" && (
                 <a href="/admin/users" style={{ display: "block", padding: "6px 16px", fontSize: 13, color: "var(--ink2)", textDecoration: "none" }}>
                   用戶管理

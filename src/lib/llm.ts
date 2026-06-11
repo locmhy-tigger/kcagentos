@@ -12,6 +12,7 @@ export interface LLMOptions {
   model?: string;
   maxTokens?: number;
   stream?: boolean;
+  baseUrl?: string; // 本地引擎自訂 URL（覆蓋環境變數）
 }
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -43,9 +44,10 @@ export async function* streamLLM(
 
   if (engine === "ollama" || engine === "lmstudio") {
     const baseUrl =
-      engine === "ollama"
+      opts.baseUrl ||
+      (engine === "ollama"
         ? (process.env.OLLAMA_URL ?? "http://localhost:11434")
-        : (process.env.LMSTUDIO_URL ?? "http://localhost:1234");
+        : (process.env.LMSTUDIO_URL ?? "http://localhost:1234"));
 
     const apiMessages = system
       ? [{ role: "system", content: system }, ...messages]

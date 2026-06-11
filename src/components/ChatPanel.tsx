@@ -32,14 +32,16 @@ interface ChatPanelProps {
   onAgentStatus?: (agentId: string, status: AgentStatus) => void;
   initialPrompt?: string;
   engine?: string;
+  engineConfig?: { baseUrl?: string; model?: string };
 }
 
-export default function ChatPanel({ onAgentStatus, initialPrompt, engine = "claude" }: ChatPanelProps) {
+export default function ChatPanel({ onAgentStatus, initialPrompt, engine = "claude", engineConfig }: ChatPanelProps) {
   const [messages, setMessages]     = useState<Message[]>([]);
   const [input, setInput]           = useState("");
   const [loading, setLoading]       = useState(false);
   const [streaming, setStreaming]   = useState("");
   const [activeAgent, setActiveAgent] = useState<string | null>(null);
+  const [privacyHint, setPrivacyHint] = useState(false);
   const bottomRef                   = useRef<HTMLDivElement>(null);
   const textareaRef                 = useRef<HTMLTextAreaElement>(null);
 
@@ -72,7 +74,7 @@ export default function ChatPanel({ onAgentStatus, initialPrompt, engine = "clau
       const res = await fetch("/api/chat", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ messages: apiMessages, engine }),
+        body:    JSON.stringify({ messages: apiMessages, engine, engineConfig }),
       });
 
       const reader = res.body!.getReader();
@@ -96,6 +98,9 @@ export default function ChatPanel({ onAgentStatus, initialPrompt, engine = "clau
               setActiveAgent(data.agentId);
               onAgentStatus?.(data.agentId, "running");
             }
+
+            // A06 雲端成績分析 → 建議切換本地引擎
+            if (data.privacyHint) setPrivacyHint(true);
 
             // 伺服器錯誤 → 顯示錯誤訊息
             if (data.error) {
@@ -131,7 +136,8 @@ export default function ChatPanel({ onAgentStatus, initialPrompt, engine = "clau
         .replace(/\[DOCTYPE:[^\]]+\]/g, "")
         .replace(/\[NEEDS_APPROVAL\]/g, "")
         .replace(/\[ROUTE:\w+\]/g, "")
-        .replace(/\[NEED_TOOL:\w+\]/g, "")
+        .replace(/\[NEED_TOOL:\w+\](\s*\{[\s\S]*?\})?/g, "")
+        .replace(/\[TITLE:[^\]]+\]/g, "")
         .trim();
 
       // 只有真正有內容才加到訊息列表
@@ -182,6 +188,30 @@ export default function ChatPanel({ onAgentStatus, initialPrompt, engine = "clau
         position:   "relative",
       }}
     >
+      {/* A06 私隱提示 */}
+      {privacyHint && (
+        <div
+          style={{
+            background: "#FFF8ED",
+            borderBottom: "1px solid var(--amber)",
+            padding:    "8px 20px",
+            fontSize:   12,
+            color:      "var(--ink)",
+            display:    "flex",
+            alignItems: "center",
+            gap:        8,
+          }}
+        >
+          <span>💡 處理學生成績等敏感數據時，建議切換<strong>本地引擎</strong>（撳右上角 ⚙ 引擎標籤），數據不出校。</span>
+          <button
+            onClick={() => setPrivacyHint(false)}
+            style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "var(--ink3)", fontSize: 14 }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* 訊息區 */}
       <div
         style={{

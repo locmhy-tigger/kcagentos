@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 interface Item   { name: string; qty: string }
 interface Supplier { name: string; phone: string; prices: string[]; recommended: boolean }
@@ -52,6 +52,75 @@ export default function QuotationClient() {
   const [deptHeadRank,   setDeptHeadRank]   = useState("");
   const [deptHeadDate,   setDeptHeadDate]   = useState(today);
   const [loading,      setLoading]      = useState(false);
+
+  // Upload & parse state
+  const [parseFile,    setParseFile]    = useState<File | null>(null);
+  const [parsing,      setParsing]      = useState(false);
+  const [parseMsg,     setParseMsg]     = useState("");
+  const [parseOk,      setParseOk]      = useState(false);
+  const fileInputRef                    = useRef<HTMLInputElement>(null);
+
+  function applyParsedData(d: Record<string, unknown>) {
+    if (d.quoteDate    && typeof d.quoteDate    === "string") setQuoteDate(d.quoteDate);
+    if (d.quoteMethod  && typeof d.quoteMethod  === "string") setQuoteMethod(d.quoteMethod);
+    if (typeof d.higherReason === "string") setHigherReason(d.higherReason);
+    if (typeof d.fewerReason  === "string") setFewerReason(d.fewerReason);
+    if (d.batchName    && typeof d.batchName    === "string") setBatchName(d.batchName);
+    if (d.category     && typeof d.category     === "string") setCategory(d.category);
+    if (d.dept         && typeof d.dept         === "string") setDept(d.dept);
+    if (d.purpose      && typeof d.purpose      === "string") setPurpose(d.purpose);
+    if (d.deliveryDate && typeof d.deliveryDate === "string") setDeliveryDate(d.deliveryDate);
+    if (d.funding      && typeof d.funding      === "string") setFunding(d.funding);
+    if (d.requesterName && typeof d.requesterName === "string") setRequesterName(d.requesterName);
+    if (d.requesterRank && typeof d.requesterRank === "string") setRequesterRank(d.requesterRank);
+    if (d.requesterDate && typeof d.requesterDate === "string") setRequesterDate(d.requesterDate);
+    if (d.deptHeadName  && typeof d.deptHeadName  === "string") setDeptHeadName(d.deptHeadName);
+    if (d.deptHeadRank  && typeof d.deptHeadRank  === "string") setDeptHeadRank(d.deptHeadRank);
+    if (d.deptHeadDate  && typeof d.deptHeadDate  === "string") setDeptHeadDate(d.deptHeadDate);
+
+    if (Array.isArray(d.items) && d.items.length > 0) {
+      setItems((d.items as Item[]).slice(0, 3).map((it) => ({
+        name: String(it.name ?? ""),
+        qty:  String(it.qty  ?? ""),
+      })));
+    }
+    if (Array.isArray(d.suppliers) && d.suppliers.length > 0) {
+      const parsed = (d.suppliers as Supplier[]).slice(0, 3).map((s) => ({
+        name:        String(s.name  ?? ""),
+        phone:       String(s.phone ?? ""),
+        prices:      Array.isArray(s.prices) ? s.prices.map(String) : [],
+        recommended: Boolean(s.recommended),
+      }));
+      // Ensure at least 2 suppliers
+      while (parsed.length < 2) parsed.push({ name: "", phone: "", prices: [], recommended: false });
+      setSuppliers(parsed);
+    }
+  }
+
+  async function handleParse() {
+    if (!parseFile) { setParseMsg("請選擇檔案"); return; }
+    setParsing(true);
+    setParseMsg("");
+    setParseOk(false);
+    try {
+      const fd = new FormData();
+      fd.append("file", parseFile);
+      const res  = await fetch("/api/tools/quotation/parse", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) {
+        setParseMsg(`⚠ ${json.error ?? "解析失敗"}`);
+      } else {
+        applyParsedData(json.data);
+        setParseOk(true);
+        setParseMsg("✓ 已成功提取並填入表格，請核對各欄位");
+        setParseFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    } catch {
+      setParseMsg("⚠ 網絡錯誤，請再試");
+    }
+    setParsing(false);
+  }
 
   function addItem() {
     if (items.length >= 3) return;
@@ -125,6 +194,56 @@ export default function QuotationClient() {
       </div>
 
       <div style={{ maxWidth: 820, margin: "0 auto", padding: "28px 20px 100px" }}>
+
+        {/* 上載現有報價（AI 自動填表） */}
+        <div style={{
+          ...sectionStyle,
+          borderColor: "var(--primary)",
+          borderStyle: "dashed",
+          background:  parseOk ? "rgba(47,145,190,0.04)" : "var(--card)",
+        }}>
+          <div style={sectionTitle}>⬆ 上載現有報價（AI 自動提取填表）</div>
+          <div style={{ fontSize: 12, color: "var(--ink3)", marginBottom: 12, lineHeight: 1.7 }}>
+            上載已填妥的報價表（支援 <strong>DOCX、PDF、JPG/PNG/WEBP</strong> 相片或掃描件），AI 會自動提取內容填入下方表格，
+            再由你核對及修改。
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 240 }}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".docx,.pdf,.jpg,.jpeg,.png,.webp,.gif,image/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={(e) => { setParseFile(e.target.files?.[0] ?? null); setParseMsg(""); setParseOk(false); }}
+                style={{ ...inputStyle, padding: "6px 10px" }}
+              />
+            </div>
+            <button
+              onClick={handleParse}
+              disabled={parsing || !parseFile}
+              style={{
+                padding: "8px 22px",
+                background: parsing ? "var(--ink3)" : "var(--primary)",
+                color: "#fff", border: "none", borderRadius: 4,
+                fontSize: 13, fontWeight: 600, cursor: (parsing || !parseFile) ? "not-allowed" : "pointer",
+                fontFamily: "var(--sans)", boxShadow: "2px 2px 0 var(--primary-light)",
+                opacity: parseFile ? 1 : 0.5,
+                flexShrink: 0,
+              }}
+            >
+              {parsing ? "AI 解析中…" : "提取並填表"}
+            </button>
+          </div>
+          {parseMsg && (
+            <div style={{
+              marginTop: 10, fontSize: 12, padding: "7px 12px", borderRadius: 3,
+              background: parseOk ? "rgba(52,199,89,0.1)" : "rgba(255,100,60,0.08)",
+              color:      parseOk ? "var(--green)" : "var(--seal)",
+              border:     `1px solid ${parseOk ? "var(--green)" : "var(--seal)"}`,
+            }}>
+              {parseMsg}
+            </div>
+          )}
+        </div>
 
         {/* ① 採購資料 */}
         <div style={sectionStyle}>

@@ -62,17 +62,21 @@ model Task {
 }
 
 model Document {
-  id             String         @id @default(cuid())
-  taskId         String         @unique
-  task           Task           @relation(fields: [taskId], references: [id])
-  userId         String
-  user           User           @relation(fields: [userId], references: [id])
-  title          String
-  docType        String
-  content        String         @db.Text
-  approvalStatus ApprovalStatus @default(NOT_REQUIRED)
-  approvedBy     String?
-  createdAt      DateTime       @default(now())
+  id               String         @id @default(cuid())
+  taskId           String         @unique
+  task             Task           @relation(fields: [taskId], references: [id])
+  userId           String
+  user             User           @relation(fields: [userId], references: [id])
+  title            String
+  docType          String
+  content          String         @db.Text
+  approvalStatus   ApprovalStatus @default(NOT_REQUIRED)
+  approvedBy       String?
+  approvedAt       DateTime?
+  rejectionReason  String?
+  driveUrl         String?
+  driveFileId      String?
+  createdAt        DateTime       @default(now())
 }
 
 model Timetable {
@@ -106,14 +110,16 @@ model AuditLog {
 }
 
 model SubstitutionRequest {
-  id            String   @id @default(cuid())
-  requesterName String
-  date          DateTime
-  periods       Int[]
-  classCode     String
-  subject       String
-  reason        String
-  candidateName String?
-  waStatus      WaStatus @default(NOT_SENT)
-  createdAt     DateTime @default(now())
+  id              String   @id @default(cuid())
+  requesterName   String
+  date            DateTime
+  periods         Int[]
+  classCode       String
+  subject         String
+  reason          String
+  candidateName   String?
+  candidateEmail  String?
+  waStatus        WaStatus @default(NOT_SENT)
+  calendarEventId String?
+  createdAt       DateTime @default(now())
 }

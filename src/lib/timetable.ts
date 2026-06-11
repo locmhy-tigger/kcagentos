@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import { MAX_PERIOD } from "@/lib/schedule";
 
+export { MAX_PERIOD };
 export const MAX_DAY = 5;
-export const MAX_PERIOD = 9;
 export const WEEKDAY_NAMES = ["", "一", "二", "三", "四", "五"];
 
 export interface TimetableRow {

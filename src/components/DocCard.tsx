@@ -11,6 +11,34 @@ interface DocCardProps {
 
 export default function DocCard({ documentId, title, docType, needsApproval }: DocCardProps) {
   const [downloading, setDownloading] = useState<"docx" | "pdf" | null>(null);
+  const [showWa, setShowWa]           = useState(false);
+  const [recipients, setRecipients]   = useState("");
+  const [waState, setWaState]         = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [waError, setWaError]         = useState("");
+
+  async function pushWhatsApp() {
+    const list = recipients.split(/[,，;；\n]/).map((r) => r.trim()).filter(Boolean);
+    if (list.length === 0) { setWaError("請輸入至少一位收件人"); return; }
+    setWaState("sending");
+    setWaError("");
+    try {
+      const res = await fetch("/api/notify", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ documentId, title, recipients: list }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setWaState("error");
+        setWaError(json.error ?? "推送失敗");
+      } else {
+        setWaState("sent");
+      }
+    } catch {
+      setWaState("error");
+      setWaError("網絡錯誤，請再試。");
+    }
+  }
 
   async function download(format: "docx" | "pdf") {
     setDownloading(format);
@@ -149,7 +177,64 @@ export default function DocCard({ documentId, title, docType, needsApproval }: D
         >
           {downloading === "pdf" ? "生成中…" : "⬇ PDF"}
         </button>
+        <button
+          onClick={() => setShowWa((v) => !v)}
+          style={{
+            padding:      "7px 14px",
+            background:   waState === "sent" ? "var(--green)" : "#25D366",
+            color:        "#fff",
+            border:       "none",
+            borderRadius: 3,
+            fontSize:     12,
+            fontWeight:   600,
+            cursor:       "pointer",
+            fontFamily:   "var(--sans)",
+            boxShadow:    "1px 1px 0 var(--primary-light)",
+          }}
+        >
+          {waState === "sent" ? "✓ 已推送" : "📲 WhatsApp 推送"}
+        </button>
       </div>
+
+      {/* WhatsApp 收件人面板 */}
+      {showWa && waState !== "sent" && (
+        <div style={{
+          marginTop: 10, padding: "10px 12px",
+          background: "var(--bg2)", borderRadius: 4,
+          border: "1px solid var(--border)",
+        }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--ink3)", marginBottom: 5 }}>
+            收件人（電話號碼或群組名，以逗號分隔）
+          </label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={recipients}
+              onChange={(e) => setRecipients(e.target.value)}
+              placeholder="例：85291234567, 教務組群組"
+              style={{
+                flex: 1, border: "1px solid var(--border)", borderRadius: 3,
+                padding: "6px 10px", fontSize: 12,
+                background: "var(--card)", color: "var(--ink)",
+                fontFamily: "var(--sans)", outline: "none",
+              }}
+            />
+            <button
+              onClick={pushWhatsApp}
+              disabled={waState === "sending"}
+              style={{
+                padding: "6px 14px", background: "#25D366", color: "#fff",
+                border: "none", borderRadius: 3, fontSize: 12, fontWeight: 600,
+                cursor: waState === "sending" ? "wait" : "pointer",
+                fontFamily: "var(--sans)",
+                opacity: waState === "sending" ? 0.7 : 1,
+              }}
+            >
+              {waState === "sending" ? "推送中…" : "發送"}
+            </button>
+          </div>
+          {waError && <p style={{ color: "var(--seal)", fontSize: 11, margin: "6px 0 0" }}>⚠ {waError}</p>}
+        </div>
+      )}
     </div>
   );
 }

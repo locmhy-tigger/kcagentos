@@ -10,9 +10,12 @@ import {
   parseDocTitle,
   agentId,
   inferTitleFromContent,
+  parseNeedTool,
+  stripToolMarkers,
   AGENT_DOC_TYPES,
   type AgentKey,
 } from "@/lib/agents";
+import { runAgentTool } from "@/lib/agent-tools";
 import { prisma } from "@/lib/prisma";
 import Pusher from "pusher";
 
@@ -40,18 +43,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "未登入" }, { status: 401 });
   }
 
-  const { messages, engine = "claude" } = (await req.json()) as {
+  const { messages, engine = "claude", engineConfig = {} } = (await req.json()) as {
     messages: LLMMessage[];
     engine?: Engine;
+    engineConfig?: { baseUrl?: string; model?: string };
   };
 
-  // 基本環境變數檢查
-  if (!process.env.ANTHROPIC_API_KEY) {
+  // Claude 引擎需要 API key；本地引擎唔需要
+  if (engine === "claude" && !process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(
-      { error: "伺服器未設定 ANTHROPIC_API_KEY，請聯絡 IT 主任。" },
+      { error: "伺服器未設定 ANTHROPIC_API_KEY，請聯絡 IT 主任，或喺設定切換本地引擎。" },
       { status: 503 },
     );
   }
+
+  const llmOpts = {
+    baseUrl: engineConfig.baseUrl,
+    model:   engineConfig.model,
+  };
 
   const userId      = session.user.id;
   const channelName = `user-${userId}`;
@@ -72,6 +81,7 @@ export async function POST(req: NextRequest) {
 
         const dispatcherSystem = loadCharter("dispatcher");
         const dispatcherReply  = await completeLLM(engine, messages, {
+          ...llmOpts,
           system:    dispatcherSystem,
           maxTokens: 512,
         });
@@ -95,8 +105,10 @@ export async function POST(req: NextRequest) {
 
         // ── Stage 2: Specialist Agent ───────────────────────────────────
         const specAgentId = agentId(routeKey);
+        // A06 成績分析 + 雲端引擎 → 提示建議切換本地引擎
+        const privacyHint = routeKey === "donna" && engine === "claude";
         await pushEvent(channelName, "agent-status", { agentId: specAgentId, status: "running" });
-        send({ agentId: specAgentId, status: "running", route: routeKey });
+        send({ agentId: specAgentId, status: "running", route: routeKey, privacyHint });
 
         // Inject any default templates for this agent's docTypes
         let specialistSystem = loadCharter(routeKey);
@@ -116,14 +128,52 @@ export async function POST(req: NextRequest) {
         } catch {
           // 範本查詢失敗不影響正常生成
         }
-        let fullText = "";
 
-        for await (const chunk of streamLLM(engine, messages, {
+        // 雲端模式下成績數據匿名化：學生姓名以學號代替
+        if (privacyHint) {
+          specialistSystem += "\n\n---\n[私隱保護]\n現時使用雲端引擎。分析及輸出時，學生一律以班別+學號表示（如 3A-12），不得在輸出中複述學生全名。並在回覆開頭提醒用戶：處理敏感成績數據建議切換本地引擎（設定 → 引擎）。";
+        }
+        let fullText = "";
+        let workingMessages = [...messages];
+
+        for await (const chunk of streamLLM(engine, workingMessages, {
+          ...llmOpts,
           system:    specialistSystem,
           maxTokens: 4096,
         })) {
           fullText += chunk;
           send({ agentId: specAgentId, text: chunk, chunk: true });
+        }
+
+        // ── 工具調用迴圈：[NEED_TOOL:x]{params} → 執行 → 結果回饋再生成 ──
+        let toolCall  = parseNeedTool(fullText);
+        let toolRound = 0;
+        while (toolCall && toolRound < 2) {
+          toolRound++;
+          send({ agentId: specAgentId, status: "running", tool: toolCall.tool });
+          await pushEvent(channelName, "agent-status", {
+            agentId: specAgentId, status: "running", tool: toolCall.tool,
+          });
+
+          const toolResult = await runAgentTool(toolCall);
+
+          workingMessages = [
+            ...workingMessages,
+            { role: "assistant" as const, content: fullText },
+            { role: "user" as const, content: `[系統：工具 ${toolCall.tool} 執行結果]\n${toolResult}\n\n請根據以上結果回覆用戶。` },
+          ];
+
+          fullText = "";
+          send({ agentId: specAgentId, text: "\n\n", chunk: true });
+          for await (const chunk of streamLLM(engine, workingMessages, {
+            ...llmOpts,
+            system:    specialistSystem,
+            maxTokens: 4096,
+          })) {
+            fullText += chunk;
+            send({ agentId: specAgentId, text: chunk, chunk: true });
+          }
+          toolCall = parseNeedTool(fullText);
         }
 
         await pushEvent(channelName, "agent-status", { agentId: specAgentId, status: "done" });
@@ -133,12 +183,13 @@ export async function POST(req: NextRequest) {
         const needsApproval = parseNeedsApproval(fullText);
         const docTitleTag   = parseDocTitle(fullText);
 
-        const cleanContent = fullText
-          .replace(/\[DOCREADY\]/g, "")
-          .replace(/\[DOCTYPE:[^\]]+\]/g, "")
-          .replace(/\[TITLE:[^\]]+\]/g, "")
-          .replace(/\[NEEDS_APPROVAL\]/g, "")
-          .trim();
+        const cleanContent = stripToolMarkers(
+          fullText
+            .replace(/\[DOCREADY\]/g, "")
+            .replace(/\[DOCTYPE:[^\]]+\]/g, "")
+            .replace(/\[TITLE:[^\]]+\]/g, "")
+            .replace(/\[NEEDS_APPROVAL\]/g, ""),
+        ).trim();
 
         // 檔案名稱：優先用 [TITLE:xxx]，其次從內容首行提取
         const docTitle = docTitleTag ?? inferTitleFromContent(docType, cleanContent);

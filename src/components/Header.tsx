@@ -23,9 +23,10 @@ const AGENTS: AgentPill[] = [
 interface HeaderProps {
   agentStatuses?: Record<string, AgentStatus>;
   engine?: string;
+  onOpenSettings?: () => void;
 }
 
-export default function Header({ agentStatuses = {}, engine = "claude" }: HeaderProps) {
+export default function Header({ agentStatuses = {}, engine = "claude", onOpenSettings }: HeaderProps) {
   const { data: session } = useSession();
   const [showMenu, setShowMenu] = useState(false);
 
@@ -112,8 +113,10 @@ export default function Header({ agentStatuses = {}, engine = "claude" }: Header
         })}
       </div>
 
-      {/* 引擎標籤 */}
-      <div
+      {/* 引擎標籤（撳入去開設定） */}
+      <button
+        onClick={onOpenSettings}
+        title="引擎設定"
         style={{
           fontFamily: "var(--mono)",
           fontSize:   10,
@@ -122,10 +125,15 @@ export default function Header({ agentStatuses = {}, engine = "claude" }: Header
           padding:    "2px 8px",
           borderRadius: 3,
           flexShrink: 0,
+          background: "none",
+          cursor:     onOpenSettings ? "pointer" : "default",
+          display:    "flex",
+          alignItems: "center",
+          gap:        4,
         }}
       >
-        {engineLabel}
-      </div>
+        ⚙ {engineLabel}
+      </button>
 
       {/* 用戶選單 */}
       {session?.user && (
@@ -169,9 +177,14 @@ export default function Header({ agentStatuses = {}, engine = "claude" }: Header
                 範本庫
               </a>
               {session.user.role === "ADMIN" && (
-                <a href="/admin/users" style={{ display: "block", padding: "6px 16px", fontSize: 13, color: "var(--ink2)", textDecoration: "none" }}>
-                  用戶管理
-                </a>
+                <>
+                  <a href="/settings/timetable" style={{ display: "block", padding: "6px 16px", fontSize: 13, color: "var(--ink2)", textDecoration: "none" }}>
+                    時間表上載
+                  </a>
+                  <a href="/admin/users" style={{ display: "block", padding: "6px 16px", fontSize: 13, color: "var(--ink2)", textDecoration: "none" }}>
+                    用戶管理
+                  </a>
+                </>
               )}
               <button
                 onClick={() => signOut({ callbackUrl: "/login" })}

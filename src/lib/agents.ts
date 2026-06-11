@@ -72,6 +72,26 @@ export function parseDocTitle(text: string): string | null {
   return match ? match[1].trim() : null;
 }
 
+export interface ToolCall {
+  tool:   string;
+  params: Record<string, unknown>;
+}
+
+// 解析 [NEED_TOOL:tool_name]{"param":...} 標記（JSON 參數可選）
+export function parseNeedTool(text: string): ToolCall | null {
+  const match = text.match(/\[NEED_TOOL:(\w+)\](\s*\{[\s\S]*?\})?/);
+  if (!match) return null;
+  let params: Record<string, unknown> = {};
+  if (match[2]) {
+    try { params = JSON.parse(match[2].trim()); } catch {}
+  }
+  return { tool: match[1], params };
+}
+
+export function stripToolMarkers(text: string): string {
+  return text.replace(/\[NEED_TOOL:\w+\](\s*\{[\s\S]*?\})?/g, "").trim();
+}
+
 // Maps each specialist agent to the docTypes it typically produces
 export const AGENT_DOC_TYPES: Partial<Record<AgentKey, string[]>> = {
   ada:   ["unit-plan", "notes", "study-plan", "event-plan"],

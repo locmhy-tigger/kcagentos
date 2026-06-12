@@ -149,7 +149,7 @@ function LoginContent() {
         </div>
 
         <p style={{ color: "var(--ink3)", fontSize: 12, textAlign: "center" }}>
-          © 2025 基督教香港崇真會基智中學 · 教師 Agent OS
+          © 2026 基智中學 · 教師 Agent OS
         </p>
       </div>
     </main>

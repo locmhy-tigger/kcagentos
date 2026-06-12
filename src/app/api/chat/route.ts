@@ -58,8 +58,8 @@ export async function POST(req: NextRequest) {
   }
 
   const llmOpts = {
-    baseUrl: engineConfig.baseUrl,
-    model:   engineConfig.model,
+    baseUrl: engineConfig.baseUrl  || undefined,
+    model:   engineConfig.model    || undefined,
   };
 
   const userId      = session.user.id;

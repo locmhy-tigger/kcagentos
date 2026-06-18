@@ -10,7 +10,7 @@ const dmMono      = DM_Mono({ subsets: ["latin"], weight: ["400", "500"], variab
 
 export const metadata: Metadata = {
   title: "基智 Agent OS",
-  description: "基督教香港崇真會基智中學 · 教師智能工作台",
+  description: "基智中學 · 教師智能工作台",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

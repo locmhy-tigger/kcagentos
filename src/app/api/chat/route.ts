@@ -74,6 +74,9 @@ export async function POST(req: NextRequest) {
         } catch {}
       };
 
+      // 專員開工時即建 RUNNING 任務，dashboard 進度板先見到「處理中」
+      let runningTaskId: string | null = null;
+
       try {
         // ── Stage 1: Dispatcher (A01) ──────────────────────────────────
         await pushEvent(channelName, "agent-status", { agentId: "A01", status: "running" });
@@ -109,6 +112,28 @@ export async function POST(req: NextRequest) {
         const privacyHint = routeKey === "donna" && engine === "claude";
         await pushEvent(channelName, "agent-status", { agentId: specAgentId, status: "running" });
         send({ agentId: specAgentId, status: "running", route: routeKey, privacyHint });
+
+        // 即時建立 RUNNING 任務（完成後更新；純對話回合會刪走）
+        try {
+          const lastUserMsg = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+          const runningTask = await prisma.task.create({
+            data: {
+              userId,
+              title:   lastUserMsg.trim().slice(0, 50) || "新任務",
+              agentId: specAgentId,
+              status:  "RUNNING",
+            },
+          });
+          runningTaskId = runningTask.id;
+          await pushEvent(channelName, "task-update", {
+            taskId:  runningTask.id,
+            status:  "RUNNING",
+            agentId: specAgentId,
+            title:   runningTask.title,
+          });
+        } catch (dbErr) {
+          console.error("[api/chat] create running task:", dbErr);
+        }
 
         // Inject any default templates for this agent's docTypes
         let specialistSystem = loadCharter(routeKey);
@@ -198,14 +223,13 @@ export async function POST(req: NextRequest) {
 
         if (docReady) {
           try {
-            const task = await prisma.task.create({
-              data: {
-                userId,
-                title:   docTitle,
-                agentId: specAgentId,
-                status:  needsApproval ? "PENDING_APPROVAL" : "DONE",
-              },
-            });
+            const taskData = {
+              title:  docTitle,
+              status: (needsApproval ? "PENDING_APPROVAL" : "DONE") as "PENDING_APPROVAL" | "DONE",
+            };
+            const task = runningTaskId
+              ? await prisma.task.update({ where: { id: runningTaskId }, data: taskData })
+              : await prisma.task.create({ data: { userId, agentId: specAgentId, ...taskData } });
             const doc = await prisma.document.create({
               data: {
                 taskId:         task.id,
@@ -232,6 +256,12 @@ export async function POST(req: NextRequest) {
             console.error("[api/chat] DB error:", dbErr);
             // DB 錯誤唔阻止回傳文字內容，只係唔儲存
           }
+        } else if (runningTaskId) {
+          // 純對話回合（無生成文件）— 刪走臨時任務，免進度板積塵
+          try {
+            await prisma.task.delete({ where: { id: runningTaskId } });
+          } catch {}
+          runningTaskId = null;
         }
 
         send({
@@ -248,6 +278,11 @@ export async function POST(req: NextRequest) {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error("[api/chat]", err);
+        if (runningTaskId) {
+          try {
+            await prisma.task.update({ where: { id: runningTaskId }, data: { status: "FAILED" } });
+          } catch {}
+        }
         send({ error: `處理失敗：${msg.slice(0, 120)}` });
         controller.close();
       }

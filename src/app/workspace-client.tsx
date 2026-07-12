@@ -11,9 +11,9 @@ import SettingsModal, {
   saveEngineSettings,
 } from "@/components/SettingsModal";
 
-export default function WorkspaceClient() {
+export default function WorkspaceClient({ initialQueryPrompt = "" }: { initialQueryPrompt?: string }) {
   const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
-  const [promptTrigger, setPromptTrigger] = useState<string>("");
+  const [promptTrigger, setPromptTrigger] = useState<string>(initialQueryPrompt);
   const [engineSettings, setEngineSettings] = useState<EngineSettings>(DEFAULT_ENGINE_SETTINGS);
   const [showSettings, setShowSettings]   = useState(false);
 

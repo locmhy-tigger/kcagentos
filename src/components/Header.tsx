@@ -132,6 +132,28 @@ export default function Header({ agentStatuses = {}, engine = "claude", onOpenSe
         })}
       </div>
 
+      {/* 指揮中心 */}
+      <a
+        href="/dashboard"
+        style={{
+          fontFamily:  "var(--mono)",
+          fontSize:    10,
+          color:       "var(--ink3)",
+          background:  "var(--primary-light)",
+          border:      "1px solid var(--border)",
+          padding:     "2px 8px",
+          borderRadius: 3,
+          flexShrink:  0,
+          textDecoration: "none",
+          display:     "flex",
+          alignItems:  "center",
+          gap:         4,
+        }}
+        title="指揮中心"
+      >
+        🎛 儀表板
+      </a>
+
       {/* 待批核文件徽章 (ADMIN/APPROVER) */}
       {isApprover && (
         <a

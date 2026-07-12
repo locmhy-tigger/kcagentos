@@ -48,6 +48,18 @@ model User {
   createdAt   DateTime   @default(now())
   tasks       Task[]
   documents   Document[]
+  todos       Todo[]
+}
+
+model Todo {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  text      String
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Task {

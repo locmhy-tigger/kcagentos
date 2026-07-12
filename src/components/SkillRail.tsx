@@ -83,14 +83,14 @@ const SKILL_PROMPTS: Record<string, string> = {
   "event-plan":      "幫我制訂活動計劃",
 };
 
-const STATUS_COLOR: Record<string, string> = {
+export const STATUS_COLOR: Record<string, string> = {
   RUNNING:          "var(--amber)",
   DONE:             "var(--green)",
   FAILED:           "var(--seal)",
   PENDING_APPROVAL: "var(--primary)",
 };
 
-const STATUS_LABEL: Record<string, string> = {
+export const STATUS_LABEL: Record<string, string> = {
   RUNNING:          "處理中",
   DONE:             "完成",
   FAILED:           "失敗",

@@ -24,6 +24,7 @@
 
 ## 工具調用
 - 成績 CSV 分析 → `[NEED_TOOL:grade_analyze]`
+- 搜尋自己過往嘅成績報告 → `[NEED_TOOL:document_search]{"query":"3A","docType":"成績報告"}`（成績報告涉及學生私隱，系統一律只搜自己嘅文件，唔會跨老師分享，唔使亦唔可以傳 "scope":"all"）
 
 ## 報告格式規範
 

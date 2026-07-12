@@ -180,7 +180,7 @@ export async function POST(req: NextRequest) {
             agentId: specAgentId, status: "running", tool: toolCall.tool,
           });
 
-          const toolResult = await runAgentTool(toolCall);
+          const toolResult = await runAgentTool(toolCall, { userId });
 
           workingMessages = [
             ...workingMessages,
